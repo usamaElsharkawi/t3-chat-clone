@@ -26,29 +26,35 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 <summary><b>1. Prisma & Database Connection</b></summary>
 
 ### What is Prisma?
+
 Prisma is an ORM (Object-Relational Mapping) that provides a type-safe database query library. It generates a client based on your schema.
 
 ### Database Connection Flow
+
 ```
 Your Code → Prisma Client → Adapter → Connection Pool → PostgreSQL
 ```
 
 ### Key Files
+
 - `prisma/schema.prisma` - Database schema definition
 - `prisma.config.ts` - Prisma configuration (database URL)
 - `lib/db.ts` - Prisma client singleton with connection pool
 - `lib/generated/prisma/` - Auto-generated Prisma client
 
 ### The Singleton Pattern
+
 ```typescript
 // lib/db.ts
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
+  prisma: PrismaClient | undefined;
+};
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  adapter: adapter
-})
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    adapter: adapter,
+  });
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
@@ -63,22 +69,29 @@ if (process.env.NODE_ENV !== "production") {
 <summary><b>2. Connection Pool</b></summary>
 
 ### What is a Connection Pool?
+
 A connection pool maintains multiple open connections to the database, reusing them instead of creating new ones for each query.
 
 ### Why Use It?
+
 - **Performance**: Creating connections is slow (~100-300ms)
 - **Resource Management**: Limits concurrent connections
 - **Prevents Memory Leaks**: In development, hot-reload can create many connections
 
-### Default Pool Settings
+### Connection Pool Settings (Neon / Serverless)
+
+Our `lib/db.ts` configures the pool for Neon's serverless Postgres:
+
 ```typescript
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 10,              // Max 10 connections
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-})
+  connectionTimeoutMillis: 30_000, // wait through Neon cold starts
+  idleTimeoutMillis: 30_000,
+  max: 5,                          // avoid exhausting Neon's connection limit
+});
 ```
+
+**Why these values?** Neon's compute scales to zero when idle, so the first connection after a pause can take a few seconds to "wake up." The short default `pg` timeout caused intermittent `PrismaClientKnownRequestError` (P1001) errors mid-query; the longer timeout and bounded pool fix that.
 
 </details>
 
@@ -86,24 +99,27 @@ const pool = new Pool({
 <summary><b>3. Prisma Client & Adapter</b></summary>
 
 ### Prisma Client
+
 The generated query library with type-safe methods:
+
 ```typescript
 // Query methods
-await prisma.user.findMany()
-await prisma.user.findUnique({ where: { id: 1 } })
-await prisma.user.create({ data: { name: "John" } })
-await prisma.user.update({ where: { id: 1 }, data: { name: "Jane" } })
-await prisma.user.delete({ where: { id: 1 } })
+await prisma.user.findMany();
+await prisma.user.findUnique({ where: { id: 1 } });
+await prisma.user.create({ data: { name: "John" } });
+await prisma.user.update({ where: { id: 1 }, data: { name: "Jane" } });
+await prisma.user.delete({ where: { id: 1 } });
 ```
 
 ### Adapter Pattern
+
 The adapter connects Prisma to different database connection methods:
 
-| Environment | Adapter |
-|-------------|---------|
-| Traditional Server | `PrismaPg` |
-| Serverless (Vercel) | `PrismaNeon` |
-| Edge Functions | `PrismaAccelerate` |
+| Environment         | Adapter            |
+| ------------------- | ------------------ |
+| Traditional Server  | `PrismaPg`         |
+| Serverless (Vercel) | `PrismaNeon`       |
+| Edge Functions      | `PrismaAccelerate` |
 
 ```typescript
 // In your code
@@ -118,6 +134,7 @@ const prisma = new PrismaClient({ adapter });
 <summary><b>4. Next.js App Router</b></summary>
 
 ### File Structure
+
 ```
 app/
 ├── layout.tsx    # Root layout - wraps all pages
@@ -125,11 +142,13 @@ app/
 ```
 
 ### How It Works
+
 - Each folder in `app/` represents a route
 - `page.tsx` makes that route accessible
 - `layout.tsx` wraps pages in that folder and subfolders
 
 ### Root Layout
+
 ```typescript
 // app/layout.tsx
 export default function RootLayout({ children }) {
@@ -149,9 +168,11 @@ export default function RootLayout({ children }) {
 <summary><b>5. shadcn/ui Components</b></summary>
 
 ### What is shadcn/ui?
+
 A component library that provides copy-paste React components styled with Tailwind CSS.
 
 ### Usage
+
 ```typescript
 import { Button } from "@/components/ui/button";
 
@@ -159,7 +180,69 @@ import { Button } from "@/components/ui/button";
 ```
 
 ### Available Components
+
 Located in `components/ui/` - includes Button, Card, Dialog, and more.
+
+</details>
+
+<details>
+<summary><b>6. Authentication with Better Auth</b></summary>
+
+### Session-Based by Default (Not JWT / Token-Based)
+
+Better Auth uses **database-backed sessions** by default:
+
+- On login it creates a row in the `session` table and sets an **HTTP-only cookie** containing an **opaque random token** (the `token` column) — *not* a JWT.
+- On each request, `getSession` reads the cookie, queries the `session` table, and joins the `user` table.
+
+This is why every authenticated request hits our database. (Better Auth *can* be configured for stateless JWT sessions or `Authorization: Bearer` / API-key auth, but the default is stateful DB sessions.)
+
+### It Uses OUR Database
+
+In `lib/auth.ts` we bridge Better Auth to our Prisma client:
+
+```typescript
+export const auth = betterAuth({
+  database: prismaAdapter(prisma, { provider: "postgresql" }),
+  // ...
+});
+```
+
+`prismaAdapter` is what tells Better Auth to store sessions/users in **our** `user`, `session`, `account`, and `verification` tables on our Neon Postgres database.
+
+### `getCurrentUser` & `session.user`
+
+`modules/authentication/actions/index.ts`:
+
+```typescript
+export const getCurrentUser = async () => {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session) return null;
+    return session.user;
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("getCurrentUser: failed to fetch session", error);
+    } else {
+      console.warn("getCurrentUser: failed to fetch session");
+    }
+    return null;
+  }
+};
+```
+
+Flow:
+
+1. Read the session cookie.
+2. Query our `session` table (`db.session.findFirst({ where: { token } })`).
+3. Join to our `user` table via `session.userId`.
+4. Return that row as `session.user`.
+
+**`session.user` is the current, live row of the logged-in user in OUR `user` table** — re-queried on every call, so it always reflects the latest DB state. A separate `prisma.user.findUnique({ where: { id: session.user.id } })` would be redundant for the default fields; it is only needed if you require custom columns that `getSession` isn't configured to return (in which case prefer declaring `additionalFields` in `lib/auth.ts`).
+
+### Why `getCurrentUser` Catches Errors
+
+The `try/catch` degrades a failed session lookup (e.g. a transient DB connection drop) to `null` ("not authenticated") instead of crashing the page. This is exactly what happened with the intermittent Neon cold-start error: `getSession`'s `findFirst` failed, was caught, and returned `null` (see section 2 for the connection hardening that prevents it).
 
 </details>
 
