@@ -19,7 +19,7 @@ function ChatSidebar({user}:any) {
   const [searchQuery, setSearchQuery] = useState("");
 
   return (
-    <aside className="flex h-full w-64 flex-col border-r border-border bg-sidebar">
+    <aside className="flex h-full w-67 flex-col border-r border-border bg-sidebar">
       <div className="flex items-center border-b border-sidebar-border px-4 py-3">
         <Image src="/logo.svg" alt="Logo" width={100} height={100} />
       </div>
@@ -57,7 +57,7 @@ function ChatSidebar({user}:any) {
       </div>
       <div className="flex-1 overflow-y-auto px-2"></div>
       {/* footer */}
-      <div className="p-4 flex items-center gap-3 border-t border-sidebar-border">
+      <div className="  p-4 flex items-center gap-3 border-t border-sidebar-border">
         <UserButton user={user} />
         <span className="flex-1 text-sm text-sidebar-foreground truncate">
           {user.email}

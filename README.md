@@ -246,6 +246,107 @@ The `try/catch` degrades a failed session lookup (e.g. a transient DB connection
 
 </details>
 
+<details>
+<summary><b>7. API Route Handlers — Best Practices</b></summary>
+
+### Example: `app/api/ai/get-models/route.ts`
+
+```typescript
+export async function GET(request: NextRequest) {
+  // 1. Validate environment first
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "OPENROUTER_API_KEY is not defined" },
+      { status: 500 },
+    );
+  }
+
+  try {
+    // 2. Fetch external API
+    const res = await fetch("https://openrouter.ai/api/v1/models", {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "content-Type": "application/json",
+      },
+    });
+
+    // 3. Handle non-200 responses from upstream
+    if (!res.ok) {
+      return NextResponse.json(
+        { error: "Failed to fetch models" },
+        { status: 502 }, // Bad Gateway — upstream failed
+      );
+    }
+
+    // 4. Parse and transform
+    const data = await res.json();
+    const freeModels = data.data.filter(
+      (m: any) => m.pricing.prompt === "0" && m.pricing.completion === "0",
+    );
+
+    // 5. Return success
+    return NextResponse.json(freeModels);
+  } catch (err) {
+    // 6. Catch network errors — log the real error, return a clean message
+    console.error("OpenRouter request failed:", err);
+    return NextResponse.json(
+      { error: "Could not reach OpenRouter" },
+      { status: 502 },
+    );
+  }
+}
+```
+
+### The 6 Principles for Any Future API Endpoint
+
+#### 1. Validate inputs / environment first
+Check env vars, params, and request body **before** doing anything else. Fail fast.
+
+```typescript
+if (!process.env.SOME_KEY)
+  return Response.json({ error: "Missing config" }, { status: 500 });
+if (!body.name)
+  return Response.json({ error: "Name is required" }, { status: 400 });
+```
+
+#### 2. Use try/catch around external calls
+Any `fetch`, database query, or third-party API can throw. Always wrap it.
+
+#### 3. Return meaningful HTTP status codes
+
+| Code | Meaning | When to use |
+|---|---|---|
+| **200** | OK | Everything worked |
+| **400** | Bad Request | Client sent bad data |
+| **401** | Unauthorized | Client isn't logged in |
+| **403** | Forbidden | Client is logged in but not allowed |
+| **404** | Not Found | Resource doesn't exist |
+| **500** | Internal Server Error | Your server is broken (missing env var, crash, etc.) |
+| **502** | Bad Gateway | An API you call failed |
+| **504** | Gateway Timeout | An API you call timed out |
+
+#### 4. Don't leak internals to the client
+Log the real error on the server, return a clean message to the client.
+
+```typescript
+catch (err) {
+  console.error("Real error for debugging:", err);
+  return Response.json({ error: "Something went wrong" }, { status: 500 });
+}
+```
+
+#### 5. Separate client errors (4xx) from server errors (5xx)
+- **4xx** = the client did something wrong (bad request, not authenticated).
+- **5xx** = your server or something it depends on is broken.
+
+The frontend uses this distinction to decide what to show the user.
+
+#### 6. Keep each handler focused
+One route = one job. Don't mix authentication, database writes, and external API calls in the same handler.
+
+</details>
+
 ---
 
 ## Learn More

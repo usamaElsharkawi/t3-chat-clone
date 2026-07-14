@@ -142,7 +142,7 @@ export default function UserButton({
         )}
       </DropdownMenuTrigger>
       
-      <DropdownMenuContent className="w-64" align="end">
+      <DropdownMenuContent className="w-64" align="start" side="top" sideOffset={8} alignOffset={-20} >
         <DropdownMenuGroup>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-2">
