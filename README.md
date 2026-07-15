@@ -347,6 +347,105 @@ One route = one job. Don't mix authentication, database writes, and external API
 
 </details>
 
+<details>
+<summary><b>8. TanStack Query — Server State Management</b></summary>
+
+### What problem does it solve?
+
+TanStack Query manages **server state** — data that lives on your server (database, external API) and is fetched into the UI. It eliminates the need for manual `useEffect` + `useState` fetching boilerplate.
+
+### Where it's wired in our app
+
+**`components/providers/query-provider.tsx`** — creates a `QueryClient` instance and wraps the app:
+
+```typescript
+"use client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
+
+export function QueryProvider({ children }: { children: React.ReactNode }) {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 5 * 60 * 1000, // 5 min before refetch
+            retry: 2,                  // retry twice on failure
+          },
+        },
+      }),
+  );
+  return (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+}
+```
+
+**`app/layout.tsx`** — wraps the entire app:
+
+```typescript
+<QueryProvider>
+  <ThemeProvider>
+    <TooltipProvider>{children}</TooltipProvider>
+  </ThemeProvider>
+</QueryProvider>
+```
+
+### How to use it in any client component
+
+```typescript
+"use client";
+import { useQuery } from "@tanstack/react-query";
+
+export function ModelList() {
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["free-models"],         // unique cache key
+    queryFn: async () => {
+      const res = await fetch("/api/ai/get-models");
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  if (isLoading) return <p>Loading...</p>;
+  if (isError) return <p>Error: {error.message}</p>;
+  return data.map((model: any) => <p key={model.id}>{model.name}</p>);
+}
+```
+
+### Key Concepts
+
+| Concept | What it means |
+|---|---|
+| **queryKey** | A unique identifier for each piece of data (e.g. `["free-models"]`). Two components with the same key share one cache entry and one fetch. |
+| **queryFn** | The function that fetches data. Must return a promise. Throwing an error triggers retry. |
+| **staleTime** | How long data is considered "fresh" before TanStack Query re-fetches in the background. We set 5 min. |
+| **gcTime** | How long unused cache data stays in memory before cleanup. Default 5 min. |
+| **retry** | How many times to retry failed fetches before showing the error. We set 2. |
+| **isLoading** | `true` only on the **first load** (no cached data and fetch is in progress) |
+| **isFetching** | `true` on **any** fetch, including background refetches (useful for showing a subtle refresh indicator) |
+
+### Server State vs Client State
+
+| | Server State (TanStack Query) | Client State (React `useState`) |
+|---|---|---|
+| **Examples** | AI models list, chat messages, user profile | Form input, dropdown open/close, selected item ID |
+| **Where data lives** | Server / DB / external API | Browser memory |
+| **Who manages it** | TanStack Query | React |
+| **How to get it** | `useQuery` | `useState` or `useReducer` |
+| **How to update it** | `useMutation` + `invalidateQueries` | `setState(...)` |
+| **Does it persist on refresh?** | Yes (re-fetched from server) | No (unless saved to localStorage) |
+| **Can other users see changes?** | Yes | No |
+
+### Rule of thumb
+
+> "If another user changes this data, should my UI update?"
+>
+> - **Yes** → Server State → TanStack Query (`useQuery`)
+> - **No** → Client State → React (`useState`)
+
+</details>
+
 ---
 
 ## Learn More
