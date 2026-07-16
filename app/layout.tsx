@@ -3,9 +3,9 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ThemeProvider } from "@/components/providers/theme-provider"
-import { QueryProvider } from "@/components/providers/query-provider"
-
+import { ThemeProvider } from "@/components/providers/theme-provider";
+import { QueryProvider } from "@/components/providers/query-provider";
+import { Toaster } from "sonner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -40,20 +40,21 @@ export default function RootLayout({
         jetbrainsMono.variable,
       )}
     >
-    
-        <body className="min-h-full flex flex-col">
-          <QueryProvider>
+      <body className="min-h-full flex flex-col">
+        <QueryProvider>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
           >
-            <TooltipProvider>{children}</TooltipProvider>
+            <TooltipProvider>
+              {children}
+              <Toaster />
+            </TooltipProvider>
           </ThemeProvider>
-          </QueryProvider>
-        </body>
-    
+        </QueryProvider>
+      </body>
     </html>
   );
 }

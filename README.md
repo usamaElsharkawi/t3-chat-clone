@@ -446,9 +446,112 @@ export function ModelList() {
 
 </details>
 
----
+<details>
+<summary><b>9. Chat UI Components — Patterns & Lessons</b></summary>
 
-## Learn More
+### Files
+| Component | Purpose | Location |
+|---|---|---|
+| `ChatMessageView` | Orchestrator — manages suggestion state, renders tabs + form | `modules/chat/components/chat-view/chat-message-view.tsx` |
+| `ChatWelcomeTabs` | Welcome screen with category tabs and suggestion messages | `modules/chat/components/chat-view/chat-welcome-tabs.tsx` |
+| `ChatMessageForm` | Text input + model selector + send button | `modules/chat/components/chat-view/chat-message-form.tsx` |
+| `ModelSelector` | Searchable model picker (popover) + details dialog | `modules/chat/components/chat-view/model-selector.tsx` |
+| `useGetAiModels` | TanStack Query hook that fetches free models | `modules/chat/hooks/use-get-ai-models.ts` |
+
+### Key Patterns Learned
+
+1. **Base UI `render` prop (always for triggers)** — `PopoverTrigger`, `DropdownMenuTrigger` render their own `<button>`. Never nest a `Button` inside them. Use `render={<Button .../>}` to make the Button *become* the trigger.
+
+2. **No `asChild` in Base UI** — `asChild` is a Radix UI concept. Base UI uses `render` instead. Passing `asChild` causes a DOM prop warning.
+
+3. **Dialog closing Popover (outside click)** — A Dialog portaled to body triggers the Popover's "outside click" detection. Fix: guard `onOpenChange`:
+   ```tsx
+   onOpenChange={(nextOpen) => {
+     if (detailsOpen && !nextOpen) return;
+     setOpen(nextOpen);
+   }}
+   ```
+
+4. **Null safety in API data** — OpenRouter API returns `null` for some fields (`max_completion_tokens`). Always guard: `if (!length) return "N/A"`.
+
+5. **Suggestion injection pattern** — `ChatMessageView` holds `selectedMessage` state. `ChatWelcomeTabs` sets it via `onMessageSelect`. `ChatMessageForm` reads it via `initialMessage` prop, fills textarea via `useEffect`, then calls `onMessageChange("")` to reset.
+
+6. **State per component** — Popover open/close, dialog open/close, search query, selected model — all local `useState` in `ModelSelector`. No context needed for 1-level prop drilling.
+
+</details>
+
+<details>
+<summary><b>10. Server Actions + TanStack Query — The Cache-&-Security Pattern</b></summary>
+
+### Why This Pattern Works
+
+| Layer | What It Gives You | Why It Matters |
+|---|---|---|
+| **Server Actions** (`"use server"`) | Runs only on the server; no client bundle; type-safe RPC; direct DB access | You get **type-safe server code** without separate API route handlers. The server owns the trust boundary. |
+| **TanStack Query** (`useQuery`/`useMutation`) | Caching, background refetch, deduplication, retries, optimistic updates, query invalidation | You get **automatic cache sync** without manual `useState` + `useEffect` spaghetti. |
+
+Together, they give the best of both worlds:
+- Server Actions become the **data source** (no REST endpoints needed).
+- TanStack Query becomes the **cache manager** (not context/redux).
+
+### Mental Model: Cache Keys Are Your API Contract
+
+```ts
+// Good query keys are hierarchical and scoped
+queryKey: ["messages", chatId]   // Scoped to a chat
+queryKey: ["chats", userId]       // Scoped to a user
+queryKey: ["ai-models"]          // Global for everyone
+```
+
+When you create or delete data:
+```ts
+onSuccess: () => {
+  queryClient.invalidateQueries({ queryKey: ["messages", chatId] });
+  // Forces TanStack to re-run the queryFn and update the UI
+}
+```
+
+### Server Actions in TanStack Query — It's Safe
+
+**Bad (calls on every render):**
+```ts
+queryFn: getAllChats(),   // ❌ Calls immediately — bad
+```
+
+**Good (function reference):**
+```ts
+queryFn: () => getAllChats(),   // ✅ Function passed; TanStack calls it on cache miss
+```
+
+A Server Action is just a function returning `Promise<T>` under the hood, so it works perfectly in `queryFn`.
+
+### When to Use This Pattern
+
+| Situation | ✅ Use Server Actions + TKQ | Reason |
+|---|---|---|
+| Full-stack TypeScript app (Next.js only) | ✅ Yes | Shared types, no API duplication |
+| You need public endpoints (mobile, external APIs) | ❌ No | Server Actions are Next.js-internal |
+| Simple static site with 1-2 reads | ❌ No | Overhead outweighs benefit |
+| Chat/AI app with real-time-ish updates | ✅ Yes | Caching + invalidation is essential |
+
+### Files in This Project
+
+| File | Purpose |
+|---|---|
+| `modules/chat/actions/index.ts` | Server Actions (`createChatWithMessage`, `getAllChats`, `getChatById`, `deleteChat`) |
+| `modules/chat/hooks/use-chats.ts` | TanStack Query wrappers (`useGetChats`, `useCreateChat`, `useDeleteChat`) |
+
+### Pro Tips
+
+1. **Group related actions** in one file (`modules/X/actions/index.ts`). It's your repository layer.
+2. **One action = one concern** (`createChat`, `getAllChats`, `deleteChat`). Don't make monolithic actions.
+3. **Return `{ success: boolean, data?, error? }`** — explicit and type-safe.
+4. **Never call a Server Action directly from JSX** — always wrap in `useQuery` or `useMutation` so caching/retry works.
+5. **For fire-and-forget operations** (no cache needed), call directly with `.then()`, but it's rare.
+
+</details>
+
+---
 
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Prisma Documentation](https://prisma.io/docs)

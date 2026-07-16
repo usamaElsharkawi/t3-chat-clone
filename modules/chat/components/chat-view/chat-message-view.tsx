@@ -1,9 +1,39 @@
-import React from 'react'
+"use client"
+import React, { useState } from 'react'
+import ChatWelcomeTabs from './chat-welcome-tabs';
+import ChatMessageForm from './chat-message-form';
 
-function ChatMessageView({user}) {
+type ChatMessageViewProps = {
+  user?: {
+    name?: string | null;
+    image?: string | null;
+  } | null;
+};
+
+const ChatMessageView = ({user}: ChatMessageViewProps) => {
+    const [selectedMessage , setSelectedMessage] = useState("");
+
+    console.log(selectedMessage);
+      const handleMessageSelect = (message: string) => {
+    setSelectedMessage(message);
+  };
+
+  const handleMessageChange = () => {
+    setSelectedMessage("");
+  };
+
+
   return (
     <div className='flex flex-col items-center justify-center h-screen space-y-10'>
+        <ChatWelcomeTabs
+        userName={user?.name}
+        onMessageSelect={handleMessageSelect}
+        />
 
+        <ChatMessageForm
+           initialMessage={selectedMessage}
+          onMessageChange={handleMessageChange}
+        />
     </div>
   )
 }

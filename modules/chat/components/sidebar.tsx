@@ -20,7 +20,7 @@ function ChatSidebar({user}:any) {
 
   return (
     <aside className="flex h-full w-67 flex-col border-r border-border bg-sidebar">
-      <div className="flex items-center border-b border-sidebar-border px-4 py-3">
+      <div className="flex h-14 items-center border-b border-sidebar-border px-4 py-3">
         <Image src="/logo.svg" alt="Logo" width={100} height={100} />
       </div>
 
