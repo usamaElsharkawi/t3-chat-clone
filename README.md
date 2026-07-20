@@ -20,6 +20,138 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ---
 
+## 📁 Project Structure
+
+```
+t3-chat-clone/
+├── app/                          # Next.js App Router
+│   ├── api/                      # API Routes
+│   │   ├── ai/                   # AI-related endpoints
+│   │   │   ├── chat/[chatId]/   # Chat streaming endpoint
+│   │   │   └── get-models/      # Fetch AI models
+│   │   └── auth/                # Better Auth endpoints
+│   │       └── [...all]/        
+│   ├── (auth)/                   # Auth route group
+│   │   ├── sign-in/             # Sign-in page
+│   │   └── layout.tsx           # Auth layout wrapper
+│   ├── (root)/                   # Main app route group
+│   │   ├── chat/                # Chat routes
+│   │   │   └── [chatId]/        # Dynamic chat page
+│   │   ├── layout.tsx           # Main layout (with sidebar)
+│   │   └── page.tsx             # Homepage
+│   ├── globals.css              # Global styles
+│   ├── layout.tsx               # Root layout
+│   └── favicon.ico              
+│
+├── modules/                      # Feature modules
+│   ├── authentication/          
+│   │   ├── actions/             # Server actions (getCurrentUser, requireAuth)
+│   │   └── components/          # Auth components (user-button, sign-in-form)
+│   └── chat/                    
+│       ├── actions/             # Server actions (createChat, getAllChats, etc.)
+│       ├── components/          
+│       │   ├── chat-view/       # Chat UI components
+│       │   │   ├── chat-message-view.tsx
+│       │   │   ├── chat-message-form.tsx
+│       │   │   ├── chat-welcome-tabs.tsx
+│       │   │   └── model-selector.tsx
+│       │   └── sidebar.tsx      # Collapsible sidebar
+│       ├── constant/            # Chat constants (welcome messages, etc.)
+│       ├── hooks/               # TanStack Query hooks (use-chats, use-get-ai-models)
+│       └── types/               # TypeScript types
+│
+├── components/                   # Shared components
+│   ├── providers/               # Context providers
+│   │   ├── query-provider.tsx  # TanStack Query provider
+│   │   └── theme-provider.tsx  # Theme provider (next-themes)
+│   ├── ui/                      # shadcn/ui components (70+ components)
+│   │   ├── button.tsx
+│   │   ├── input.tsx
+│   │   ├── sidebar.tsx
+│   │   ├── dialog.tsx
+│   │   └── ...                  # And many more
+│   ├── header.tsx               # App header with sidebar trigger
+│   └── mode-toggle.tsx          # Dark/light mode toggle
+│
+├── lib/                          # Core utilities
+│   ├── generated/               # Auto-generated code
+│   │   └── prisma/              # Prisma Client (generated)
+│   ├── auth.ts                  # Better Auth configuration
+│   ├── auth-client.ts           # Better Auth client (for frontend)
+│   ├── db.ts                    # Prisma Client singleton + connection pool
+│   └── utils.ts                 # Utility functions (cn, etc.)
+│
+├── prisma/                       # Database
+│   ├── migrations/              # Database migrations
+│   │   ├── 20260710234616_auth_setup/
+│   │   └── 20260715111318_chat_and_message/
+│   └── schema.prisma            # Database schema
+│
+├── hooks/                        # Global hooks
+│   └── use-mobile.ts            # Responsive breakpoint hook
+│
+├── public/                       # Static assets
+│   └── *.svg                    # Icons and logos
+│
+└── Config Files
+    ├── .env                     # Environment variables
+    ├── components.json          # shadcn/ui config
+    ├── next.config.ts           # Next.js config
+    ├── prisma.config.ts         # Prisma config (database URL)
+    ├── tailwind.config.ts       # Tailwind CSS config
+    ├── tsconfig.json            # TypeScript config
+    └── package.json             # Dependencies
+```
+
+### Key Directories Explained
+
+#### `app/` - Next.js App Router
+- **Route Groups**: `(auth)` and `(root)` are route groups (parentheses prevent them from affecting URL)
+- **API Routes**: Located in `app/api/` - handle server-side endpoints
+- **Layouts**: `layout.tsx` files wrap child pages and persist across navigation
+
+#### `modules/` - Feature Modules
+Domain-driven structure organizing code by feature:
+- **`actions/`**: Server Actions for data fetching and mutations
+- **`components/`**: Feature-specific UI components
+- **`hooks/`**: TanStack Query wrappers for data management
+- **`types/`**: TypeScript type definitions
+
+#### `components/` - Shared UI
+- **`ui/`**: shadcn/ui components (70+ pre-built, customizable components)
+- **`providers/`**: React Context providers for global state
+
+#### `lib/` - Core Library
+- **`db.ts`**: Prisma Client with connection pooling
+- **`auth.ts`**: Better Auth server configuration
+- **`utils.ts`**: Helper functions (cn for class merging, etc.)
+
+#### `prisma/` - Database Layer
+- **`schema.prisma`**: Database schema definition
+- **`migrations/`**: Version-controlled database migrations
+
+### Architecture Patterns
+
+**Server Actions + TanStack Query**
+```
+Client → TanStack Query → Server Action → Prisma → Database
+         (caching)        (validation)   (ORM)
+```
+
+**Authentication Flow**
+```
+Request → Better Auth → Session DB → User Data
+          (cookie)      (Prisma)
+```
+
+**Responsive Sidebar**
+```
+Layout → SidebarProvider → Sidebar → SidebarContent
+         (context)          (desktop: collapsible, mobile: sheet)
+```
+
+---
+
 ## 📚 Documentation
 
 <details>
