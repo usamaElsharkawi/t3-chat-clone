@@ -18,6 +18,14 @@ import { usePathname } from "next/navigation";
 import { useGetChats, useDeleteChat } from "@/modules/chat/hooks/use-chats";
 import { toast } from "sonner";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarRail,
+  useSidebar,
+} from "@/components/ui/sidebar";
 
 function groupChatsByDate(chats: any) {
   const groups: { today: any[]; yesterday: any[]; lastWeek: any[]; older: any[] } = { today: [], yesterday: [], lastWeek: [], older: [] };
@@ -55,8 +63,27 @@ const DATE_GROUPS = [
   { key: "older", label: "Older" },
 ];
 
-function ChatItem({ chat, isActive, onDelete }: any) {
+function ChatItem({ chat, isActive, onDelete, isCollapsed }: any) {
   const [isHovered, setIsHovered] = useState(false);
+
+  if (isCollapsed) {
+    return (
+      <Link
+        href={`/chat/${chat.id}`}
+        className={cn(
+          "group flex items-center justify-center rounded-xl p-2 text-sm transition-all duration-200",
+          "hover:bg-sidebar-accent hover:shadow-sm",
+          isActive && "bg-sidebar-accent shadow-sm border border-sidebar-border/50"
+        )}
+        title={chat.title}
+      >
+        <MessageSquare className={cn(
+          "h-4 w-4",
+          isActive ? "text-primary" : "text-muted-foreground group-hover:text-primary"
+        )} />
+      </Link>
+    );
+  }
 
   return (
     <Link
@@ -122,14 +149,16 @@ function ChatItem({ chat, isActive, onDelete }: any) {
   );
 }
 
-function ChatGroup({ label, chats, activeChatId, onDelete }: any) {
+function ChatGroup({ label, chats, activeChatId, onDelete, isCollapsed }: any) {
   if (chats.length === 0) return null;
 
   return (
     <div className="mb-6 animate-in fade-in duration-300">
-      <div className="mb-2.5 px-3 text-xs font-semibold text-muted-foreground/80 uppercase tracking-wider">
-        {label}
-      </div>
+      {!isCollapsed && (
+        <div className="mb-2.5 px-3 text-xs font-semibold text-muted-foreground/80 uppercase tracking-wider">
+          {label}
+        </div>
+      )}
       <div className="space-y-1">
         {chats.map((chat: any) => (
           <ChatItem
@@ -137,6 +166,7 @@ function ChatGroup({ label, chats, activeChatId, onDelete }: any) {
             chat={chat}
             isActive={chat.id === activeChatId}
             onDelete={onDelete}
+            isCollapsed={isCollapsed}
           />
         ))}
       </div>
@@ -146,6 +176,7 @@ function ChatGroup({ label, chats, activeChatId, onDelete }: any) {
 
 function ChatSidebar({ user }: any) {
   const pathname = usePathname();
+  const { state } = useSidebar();
   const activeChatId = pathname?.startsWith("/chat/")
     ? pathname.split("/")[2]
     : null;
@@ -188,87 +219,109 @@ function ChatSidebar({ user }: any) {
   };
 
   return (
-    <aside className="flex h-full w-67 flex-col border-r border-sidebar-border bg-sidebar/50 backdrop-blur-sm">
-      {/* Header */}
-      <div className="flex h-14 items-center border-b border-sidebar-border/80 px-4 py-3">
-        <Image src="/logo.svg" alt="Logo" width={100} height={100} priority />
-      </div>
-
-      {/* New Chat Button */}
-      <div className="p-3">
-        <Link href="/" className="block">
-          <Button className="w-full h-10 shadow-sm hover:shadow-md transition-shadow duration-200">
-            <PlusIcon className="h-4 w-4" />
-            New Chat
-          </Button>
-        </Link>
-      </div>
-
-      {/* Search */}
-      <div className="px-3 pb-3">
-        <div className="relative group">
-          <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
-          <Input
-            placeholder="Search conversations..."
-            className="pl-9 pr-9 h-10 bg-sidebar-accent/50 border-sidebar-border hover:bg-sidebar-accent focus:bg-sidebar-accent transition-colors"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Clear search"
-            >
-              ×
-            </button>
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+      <SidebarRail />
+      <SidebarHeader className="border-b border-sidebar-border/80">
+        <div className="flex h-14 items-center px-2">
+          {state === "expanded" ? (
+            <Image src="/logo.svg" alt="Logo" width={100} height={100} priority />
+          ) : (
+            <div className="flex items-center justify-center w-full">
+              <Image src="/logo.svg" alt="Logo" width={32} height={32} priority />
+            </div>
           )}
         </div>
-      </div>
+      </SidebarHeader>
 
-      {/* Chat List */}
-      <div className="flex-1 overflow-y-auto px-2 scrollbar-thin scrollbar-thumb-sidebar-border scrollbar-track-transparent">
-        {isPending ? (
-          <div className="flex items-center justify-center py-12">
-            <Spinner className="h-6 w-6 text-muted-foreground" />
-          </div>
-        ) : !chats?.length ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-3">
-            <div className="h-12 w-12 rounded-full bg-sidebar-accent flex items-center justify-center">
-              <MessageSquare className="h-6 w-6 text-muted-foreground" />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {searchQuery ? "No chats found" : "No conversations yet"}
-            </p>
-            {!searchQuery && (
-              <p className="text-xs text-muted-foreground/60">
-                Start a new chat to begin
-              </p>
-            )}
-          </div>
-        ) : (
-          DATE_GROUPS.map((group) => (
-            <ChatGroup
-              key={group.key}
-              label={group.label}
-              chats={groupedChats[group.key as keyof typeof groupedChats]}
-              activeChatId={activeChatId}
-              onDelete={handleDelete}
-            />
-          ))
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="p-3 border-t border-sidebar-border/80 bg-sidebar/80 backdrop-blur-sm">
-        <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-sidebar-accent/50 transition-colors">
-          <UserButton user={user} />
-          <span className="flex-1 text-sm text-sidebar-foreground/80 truncate">
-            {user.email}
-          </span>
+      <SidebarContent>
+        {/* New Chat Button */}
+        <div className="p-2">
+          <Link href="/" className="block">
+            <Button className={cn(
+              "w-full shadow-sm hover:shadow-md transition-shadow duration-200",
+              state === "collapsed" && "px-2"
+            )}>
+              <PlusIcon className="h-4 w-4" />
+              {state === "expanded" && <span className="ml-2">New Chat</span>}
+            </Button>
+          </Link>
         </div>
-      </div>
-    </aside>
+
+        {/* Search - only show when expanded */}
+        {state === "expanded" && (
+          <div className="px-2 pb-2">
+            <div className="relative group">
+              <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <Input
+                placeholder="Search conversations..."
+                className="pl-9 pr-9 h-10 bg-sidebar-accent/50 border-sidebar-border hover:bg-sidebar-accent focus:bg-sidebar-accent transition-colors"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Chat List */}
+        <div className="flex-1 overflow-y-auto px-2 scrollbar-thin scrollbar-thumb-sidebar-border scrollbar-track-transparent">
+          {isPending ? (
+            <div className="flex items-center justify-center py-12">
+              <Spinner className="h-6 w-6 text-muted-foreground" />
+            </div>
+          ) : !chats?.length ? (
+            state === "expanded" && (
+              <div className="flex flex-col items-center justify-center py-12 px-4 text-center space-y-3">
+                <div className="h-12 w-12 rounded-full bg-sidebar-accent flex items-center justify-center">
+                  <MessageSquare className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery ? "No chats found" : "No conversations yet"}
+                </p>
+                {!searchQuery && (
+                  <p className="text-xs text-muted-foreground/60">
+                    Start a new chat to begin
+                  </p>
+                )}
+              </div>
+            )
+          ) : (
+            DATE_GROUPS.map((group) => (
+              <ChatGroup
+                key={group.key}
+                label={group.label}
+                chats={groupedChats[group.key as keyof typeof groupedChats]}
+                activeChatId={activeChatId}
+                onDelete={handleDelete}
+                isCollapsed={state === "collapsed"}
+              />
+            ))
+          )}
+        </div>
+      </SidebarContent>
+
+      <SidebarFooter className="border-t border-sidebar-border/80 bg-sidebar/80 backdrop-blur-sm">
+        <div className={cn(
+          "flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-sidebar-accent/50 transition-colors",
+          state === "collapsed" && "justify-center px-0"
+        )}>
+          <UserButton user={user} />
+          {state === "expanded" && (
+            <span className="flex-1 text-sm text-sidebar-foreground/80 truncate">
+              {user.email}
+            </span>
+          )}
+        </div>
+      </SidebarFooter>
+    </Sidebar>
   );
 }
 
