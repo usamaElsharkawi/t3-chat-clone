@@ -36,7 +36,16 @@ export const useCreateChat = () => {
     }) => await createChatWithMessage(content, model),
     onSuccess: (data: any) => {
       if (data.success && data.data) {
+        // 1. Invalidate the chat list to ensure sidebar updates
         queryClient.invalidateQueries({ queryKey: ["chats"] });
+
+        // 2. OPTIMISTIC: Set the new chat directly in cache for instant UI
+        // This prevents the "disappearing message" issue when navigating away
+        queryClient.setQueryData(["chats", data.data.id], {
+          success: true,
+          data: data.data,
+        });
+
         router.push(`/chat/${data.data.id}?autoTrigger=true`);
         toast.success("Chat created successfully");
       }
@@ -48,15 +57,19 @@ export const useCreateChat = () => {
   });
 };
 
-export const useDeleteChat = (chatId: string) => {
+export const useDeleteChat = () => {
   const queryClient = useQueryClient();
   const router = useRouter();
 
   return useMutation({
-    mutationFn: () => deleteChat(chatId),
-    onSuccess: () => {
+    mutationFn: ({ chatId }: { chatId: string }) => deleteChat(chatId),
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["chats"] });
-      router.push("/");
+      // If the user is on the deleted chat's page, redirect home
+      const currentPath = window.location.pathname;
+      if (currentPath === `/chat/${variables.chatId}`) {
+        router.push("/");
+      }
     },
     onError: () => {
       toast.error("Failed to delete chat");

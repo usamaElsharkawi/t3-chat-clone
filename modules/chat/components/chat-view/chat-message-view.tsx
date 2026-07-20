@@ -13,7 +13,6 @@ type ChatMessageViewProps = {
 const ChatMessageView = ({user}: ChatMessageViewProps) => {
     const [selectedMessage , setSelectedMessage] = useState("");
 
-    console.log(selectedMessage);
       const handleMessageSelect = (message: string) => {
     setSelectedMessage(message);
   };
@@ -24,7 +23,7 @@ const ChatMessageView = ({user}: ChatMessageViewProps) => {
 
 
   return (
-    <div className='flex flex-col items-center justify-center h-screen space-y-10'>
+    <div className='flex flex-col items-center justify-center h-[calc(100vh-3.5rem)] space-y-12 py-8'>
         <ChatWelcomeTabs
         userName={user?.name}
         onMessageSelect={handleMessageSelect}

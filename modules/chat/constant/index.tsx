@@ -1,6 +1,6 @@
 import { Code, GraduationCap, Newspaper, Sparkles } from "lucide-react";
 
-const CHAT_TAB_MESSAGE = [
+export const CHAT_TAB_MESSAGE = [
   {
     tabName: "Create",
     icon: <Sparkles className="h-4 w-4" />,

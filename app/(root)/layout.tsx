@@ -6,7 +6,8 @@ import React from 'react'
 
 async function Layout({children} : {children : React.ReactNode}) {
    const session = await requireAuth();
-  return (
+
+   return (
     <div className='flex h-screen overflow-hidden'>
       <ChatSidebar user={session.user}/> 
       <main className='flex-1 overflow-hidden'> 
